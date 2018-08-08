@@ -44,6 +44,7 @@ int64_t start_ts = 0;
 int32_t start_ts_us = 0;
 char **lines = {0};
 uint16_t wValue = 0, wIndex = 0;
+FILE *logfile;
 
 char *pretty_xfertype[] = {
     " iso",
@@ -177,9 +178,13 @@ void process_packet(struct usbmon_packet *hdr, char *data)
             unique_cnt = 0;
             unique_setcnt++;
         }
-    }
-    else
+    } else {
         printf("%3"PRId64".%.6d %s\n", ts, ts_us, linebuf);
+        if (logfile) {
+            fprintf(logfile, "%3"PRId64".%.6d %s\n", ts, ts_us, linebuf);
+            fflush(logfile);
+        }
+    }
 
     fflush(stdout);
     free(linebuf);
@@ -277,7 +282,7 @@ int check_device(struct dirent *de, char *vidpid, int *bus, int *address)
     if (fd < 0)
         return 0;
     memset(buf, 0, 5);
-    if (read(fd, buf, 4) != 4) {
+    if (read(fd, buf, 4) < 1) {
         close(fd);
         return 0;
     }
@@ -290,7 +295,7 @@ int check_device(struct dirent *de, char *vidpid, int *bus, int *address)
     if (fd < 0)
         return 0;
     memset(buf, 0, 5);
-    if (read(fd, buf, 4) != 4) {
+    if (read(fd, buf, 4) < 1) {
         close(fd);
         return 0;
     }
@@ -350,6 +355,15 @@ int main(int argc, char **argv)
     if (!device) {
         usage();
         return 1;
+    }
+
+    if (! opt_unique_num) {
+        const char *LOGNAME = "usbdump.log";
+        logfile = fopen(LOGNAME, "w");
+        if (! logfile) {
+            perror(LOGNAME);
+            return 1;
+        }
     }
 
     if (find_device(device, &bus, &address)) {
